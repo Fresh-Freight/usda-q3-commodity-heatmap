@@ -6,39 +6,45 @@
 <title>Q3 Reefer Volume — USDA Heat Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <style>
   :root {
-    --bg: #ffffff;
-    --ink: #1a1410;
-    --ink-soft: #5a4a3e;
-    --ink-muted: #8a7a6e;
-    --rule: #e8ddd0;
-    --rule-strong: #c9b89e;
-    --accent: #b8431a;
-    /* heat ramp: light cream → dark burnt orange (light = low, dark = high) */
-    --heat-0: #fbecd9;
-    --heat-1: #f6d0a8;
-    --heat-2: #f0ad75;
-    --heat-3: #e88945;
-    --heat-4: #d96625;
-    --heat-5: #b8431a;
-    --heat-6: #8a2e0c;
-    --heat-7: #5c1f08;
-    --no-data: #f0eae0;
-    --mexico-fill: #d4c4a8;
+    --bg: #fafafa;
+    --ink: #1a1a1a;
+    --ink-soft: #666666;
+    --ink-muted: #999999;
+    --rule: #eef0f2;
+    --rule-strong: #dde0e4;
+    --accent: #ec7700;
+    /* heat ramp: green → orange (light = low, dark = high) */
+    --heat-0: #e8f5e0;
+    --heat-1: #c5e1a5;
+    --heat-2: #a8d490;
+    --heat-3: #7cb854;
+    --heat-4: #4a8b2c;
+    --heat-5: #ec7700;
+    --heat-6: #d96625;
+    --heat-7: #c25e00;
+    --no-data: #f4f4f4;
+    --mexico-fill: #e0e0e0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: var(--bg);
     color: var(--ink);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     font-size: 14px;
     line-height: 1.5;
   }
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 48px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 32px 24px 48px; }
+  .card {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    padding: 28px 32px;
+  }
 
   /* compact header */
   .head {
@@ -50,13 +56,13 @@
     margin-bottom: 20px;
   }
   .head h1 {
-    font-family: 'Inter', sans-serif;
-    font-size: 18px;
-    font-weight: 600;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
   .head .meta {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 11px;
     color: var(--ink-muted);
   }
@@ -71,7 +77,7 @@
     border-bottom: 1px solid var(--rule);
   }
   .ctrl-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -85,7 +91,7 @@
     background: transparent;
     color: var(--ink-soft);
     padding: 5px 11px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Open Sans', sans-serif;
     font-size: 11.5px;
     font-weight: 500;
     cursor: pointer;
@@ -94,7 +100,7 @@
     white-space: nowrap;
   }
   .pill:hover { border-color: var(--accent); color: var(--accent); }
-  .pill.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .pill.active { background: #4a8b2c; color: #ffffff; border-color: #4a8b2c; }
 
   /* map */
   .map-container {
@@ -119,7 +125,7 @@
     pointer-events: none;
   }
   .us-map .region-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 8.5px;
     letter-spacing: 0.12em;
     fill: var(--ink);
@@ -137,16 +143,16 @@
     stroke-dasharray: 3,2;
     cursor: pointer;
   }
-  .us-map .mexico-box:hover { fill: var(--heat-2); }
+  .us-map .mexico-box:hover { fill: #ec7700; }
   .us-map .mexico-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 8.5px;
     fill: var(--ink);
     pointer-events: none;
     font-weight: 500;
   }
   .us-map .mexico-section-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 9px;
     letter-spacing: 0.12em;
     fill: var(--ink-muted);
@@ -156,8 +162,8 @@
   /* tooltip */
   .tooltip {
     position: absolute;
-    background: var(--ink);
-    color: var(--bg);
+    background: #1a1a1a;
+    color: #ffffff;
     padding: 8px 12px;
     border-radius: 3px;
     font-size: 12px;
@@ -176,9 +182,9 @@
     margin-bottom: 2px;
   }
   .tooltip .tt-detail {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 11px;
-    color: #f0ad75;
+    color: #ec7700;
   }
 
   /* legend */
@@ -197,7 +203,7 @@
     gap: 4px;
   }
   .legend-label {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 10px;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -213,19 +219,19 @@
   .legend-ends {
     display: flex;
     justify-content: space-between;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 10px;
     color: var(--ink-muted);
   }
   .legend-current {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 10px;
     color: var(--ink-soft);
     text-align: right;
   }
   .legend-current strong {
     display: block;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 13px;
     font-weight: 600;
     color: var(--ink);
@@ -233,7 +239,7 @@
 
   .source {
     margin-top: 16px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'Open Sans', sans-serif;
     font-size: 10px;
     color: var(--ink-muted);
     text-align: right;
@@ -248,6 +254,7 @@
 <body>
 
 <div class="wrap">
+<div class="card">
 
   <div class="head">
     <h1>Q3 Reefer Volume by Region — <span id="commodityName"></span></h1>
@@ -290,6 +297,7 @@
   </div>
 
   <div class="source">Source: USDA AMS Specialty Crops Movement Reports · agtransport.usda.gov/rfpn-7etz</div>
+</div>
 </div>
 
 <script>
@@ -575,7 +583,7 @@
     } catch (e) {
       console.error("Failed to load US map:", e);
       document.querySelector(".map-container").innerHTML =
-        `<div style="padding:40px;text-align:center;color:#8a7a6e">
+        `<div style="padding:40px;text-align:center;color:#999999">
           Could not load US map data from CDN. Check internet connection.
         </div>`;
     }
