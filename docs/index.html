@@ -38,7 +38,7 @@
     font-size: 14px;
     line-height: 1.5;
   }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 32px 24px 48px; }
+  .wrap { max-width: 1060px; margin: 32px auto; padding: 0 24px 48px; }
   .card {
     background: #ffffff;
     border-radius: 10px;
@@ -120,8 +120,7 @@
   }
   .us-map .nation {
     fill: none;
-    stroke: var(--ink);
-    stroke-width: 0.8;
+    stroke: none;
     pointer-events: none;
   }
   .us-map .region-label {
@@ -137,13 +136,15 @@
     stroke-width: 2.5;
   }
   .us-map .mexico-box {
-    fill: var(--mexico-fill);
-    stroke: var(--ink-soft);
-    stroke-width: 0.6;
-    stroke-dasharray: 3,2;
+    stroke: #ffffff;
+    stroke-width: 0.8;
     cursor: pointer;
+    transition: stroke-width 120ms;
   }
-  .us-map .mexico-box:hover { fill: #ec7700; }
+  .us-map .mexico-box:hover {
+    stroke: var(--ink);
+    stroke-width: 1.5;
+  }
   .us-map .mexico-label {
     font-family: 'Open Sans', sans-serif;
     font-size: 8.5px;
@@ -519,7 +520,7 @@
 
     MEXICO_CROSSINGS.forEach(m => {
       const v = regionValues[m.region] || 0;
-      const fill = v > 0 ? heatColor(v, maxVal) : "var(--mexico-fill)";
+      const fill = heatColor(v, maxVal);
       mexicoG.append("rect")
         .attr("class", "mexico-box")
         .attr("x", m.x).attr("y", mexY).attr("width", 110).attr("height", 32)
