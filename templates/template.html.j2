@@ -87,9 +87,9 @@
   .controls {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--rule);
   }
   .ctrl-row {
@@ -99,6 +99,7 @@
     flex-wrap: wrap;
   }
   .ctrl-label {
+    display: none;
     font-family: 'Montserrat', sans-serif;
     font-size: 11px;
     font-weight: 600;
@@ -476,7 +477,7 @@
   }
 
   .source {
-    margin-top: 16px;
+    margin-top: 4px;
     font-family: 'Open Sans', sans-serif;
     font-size: 11px;
     color: var(--ink-muted);
@@ -537,7 +538,7 @@
     <div class="viz-area">
       <div class="viz-pane" id="mapPane">
         <div class="map-container">
-          <svg class="us-map" viewBox="0 0 975 820" preserveAspectRatio="xMidYMid meet">
+          <svg class="us-map" viewBox="0 0 975 860" preserveAspectRatio="xMidYMid meet">
             <g id="mexicoShapeG"></g>
             <g id="statesG"></g>
             <path class="nation" id="nationPath"></path>
