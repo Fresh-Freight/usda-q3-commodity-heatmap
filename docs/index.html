@@ -257,6 +257,12 @@
   .us-map .mexico-shape {
     stroke: #ffffff;
     stroke-width: 0.8;
+    cursor: pointer;
+    transition: stroke-width 120ms, stroke 120ms;
+  }
+  .us-map .mexico-shape:hover {
+    stroke: #1a1a1a;
+    stroke-width: 2;
   }
   .us-map .mexico-label {
     font-family: 'Montserrat', sans-serif;
@@ -607,6 +613,7 @@
     { region: "Mid-Atlantic", x: 880, y: 250, text: "MID-ATL", leader: { x: 800, y: 225 } },
     { region: "Southeast",    x: 705, y: 380, text: "SE" },
     { region: "Florida",      x: 800, y: 510, text: "FLA" },
+    { region: "Mexico",       x: 350, y: 720, text: "MEXICO" },
   ];
 
   // US-MX border crossings. Marker x/y = exact Albers projection of the crossing town
@@ -824,8 +831,7 @@
       const d = albersPath(mexicoFeature);
       // Label position: roughly central Mexico (Mexico City area), well inside the shape.
       mexicoG.innerHTML =
-        `<path class="mexico-shape" d="${d}" fill="var(--mexico-fill)" />
-         <text class="mexico-label" x="430" y="740" text-anchor="middle">MEXICO</text>`;
+        `<path class="mexico-shape" d="${d}" fill="var(--mexico-fill)" />`;
     } else {
       mexicoG.innerHTML = "";
     }
