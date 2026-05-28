@@ -6,19 +6,29 @@
 <title>Q3 Reefer Volume — USDA Heat Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <style>
   :root {
     --bg: #fafafa;
+    --bg-soft: #fafafa;
     --ink: #1a1a1a;
     --ink-soft: #666666;
     --ink-muted: #999999;
     --rule: #eef0f2;
-    --rule-strong: #dde0e4;
-    --accent: #ec7700;
-    /* heat ramp: green → orange (light = low, dark = high) */
+
+    --green: #4a8b2c;
+    --green-dark: #3a7522;
+    --green-darker: #16290d;
+    --green-light: #e8f5e0;
+    --green-hover: #f0f7ea;
+    --orange: #ec7700;
+
+    --no-data: #f4f4f4;
+    --mexico-fill: #f4f4f4;
+
+    /* heat ramp: green → orange */
     --heat-0: #e8f5e0;
     --heat-1: #c5e1a5;
     --heat-2: #a8d490;
@@ -27,17 +37,19 @@
     --heat-5: #ec7700;
     --heat-6: #d96625;
     --heat-7: #c25e00;
-    --no-data: #f4f4f4;
-    --mexico-fill: #e0e0e0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: var(--bg);
     color: var(--ink);
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Open Sans', system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
   }
+  h1, h2, h3 { font-family: 'Montserrat', sans-serif; font-weight: 700; }
+
   .wrap { max-width: 1060px; margin: 32px auto; padding: 0 24px 48px; }
   .card {
     background: #ffffff;
@@ -46,7 +58,7 @@
     padding: 28px 32px;
   }
 
-  /* compact header */
+  /* header */
   .head {
     display: flex;
     justify-content: space-between;
@@ -54,200 +66,420 @@
     border-bottom: 1px solid var(--rule);
     padding-bottom: 14px;
     margin-bottom: 20px;
+    gap: 16px;
   }
   .head h1 {
     font-family: 'Montserrat', sans-serif;
     font-size: 24px;
     font-weight: 700;
     letter-spacing: -0.01em;
+    color: var(--ink);
   }
+  .head h1 .commodity-name { font-weight: 600; }
   .head .meta {
     font-family: 'Open Sans', sans-serif;
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--ink-muted);
   }
 
   /* controls */
   .controls {
-    display: grid;
-    grid-template-columns: 1fr 240px;
-    gap: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     margin-bottom: 20px;
     padding-bottom: 16px;
     border-bottom: 1px solid var(--rule);
   }
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
   .ctrl-label {
-    font-family: 'Open Sans', sans-serif;
-    font-size: 10px;
-    letter-spacing: 0.12em;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-muted);
-    margin-bottom: 8px;
-    display: block;
+    min-width: 96px;
   }
-  .pill-row { display: flex; flex-wrap: wrap; gap: 5px; }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .pill {
-    border: 1px solid var(--rule-strong);
-    background: transparent;
-    color: var(--ink-soft);
-    padding: 5px 11px;
+    border: 1px solid var(--rule);
+    background: var(--bg);
+    color: var(--ink);
+    padding: 7px 14px;
     font-family: 'Open Sans', sans-serif;
-    font-size: 11.5px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    border-radius: 999px;
-    transition: all 140ms ease;
+    border-radius: 8px;
+    transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
     white-space: nowrap;
   }
-  .pill:hover { border-color: var(--accent); color: var(--accent); }
-  .pill.active { background: #4a8b2c; color: #ffffff; border-color: #4a8b2c; }
+  .pill:hover { background: var(--green-hover); border-color: var(--green); }
+  .pill.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pill {
+      transition: transform 140ms ease, background-color 140ms ease, color 140ms ease,
+                  border-color 140ms ease, box-shadow 140ms ease;
+    }
+    .pill:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .pill:active { transform: translateY(0); box-shadow: none; }
+  }
+
+  /* "More" dropdown */
+  .more-wrap { position: relative; display: inline-block; }
+  .more-pill { display: inline-flex; align-items: center; gap: 4px; }
+  .more-pill .chev { font-size: 10px; line-height: 1; }
+  .more-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    padding: 6px;
+    min-width: 240px;
+    max-height: 340px;
+    overflow-y: auto;
+    z-index: 30;
+    display: none;
+  }
+  .more-panel.open { display: block; }
+  .more-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 6px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .more-item:hover { background: var(--green-hover); }
+  .more-item.active { background: var(--green); color: #fff; font-weight: 600; }
+
+  /* viz header w/ segmented toggle */
+  .viz-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 16px;
+  }
+  .viz-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+  }
+  .seg {
+    display: inline-flex;
+    height: 32px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .seg-btn {
+    padding: 0 18px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+  .seg-btn + .seg-btn { border-left: 1px solid var(--rule); }
+  .seg-btn.active { background: var(--green); color: #fff; }
+
+  /* viz area + cross-fade */
+  .viz-area {
+    position: relative;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 12px;
+    display: grid;
+  }
+  .viz-pane {
+    grid-column: 1;
+    grid-row: 1;
+    opacity: 1;
+    transition: opacity 300ms ease;
+  }
+  .viz-pane.hidden { opacity: 0; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .viz-pane { transition: none; }
+  }
 
   /* map */
   .map-container {
     position: relative;
     width: 100%;
+    max-width: 80%;
+    margin: 0 auto;
   }
   .us-map { width: 100%; height: auto; display: block; }
   .us-map path.state {
     stroke: #ffffff;
     stroke-width: 0.8;
+    stroke-linejoin: round;
+    stroke-linecap: round;
     cursor: pointer;
-    transition: stroke-width 120ms;
+    transition: stroke-width 120ms, stroke 120ms;
   }
   .us-map path.state:hover {
-    stroke: var(--ink);
-    stroke-width: 1.5;
+    stroke: #1a1a1a;
+    stroke-width: 2;
   }
   .us-map .nation {
     fill: none;
     stroke: none;
     pointer-events: none;
   }
-  .us-map .region-label {
-    font-family: 'Open Sans', sans-serif;
-    font-size: 8.5px;
-    letter-spacing: 0.12em;
-    fill: var(--ink);
-    text-transform: uppercase;
-    font-weight: 500;
-    pointer-events: none;
-    paint-order: stroke;
-    stroke: rgba(255,255,255,0.85);
-    stroke-width: 2.5;
-  }
-  .us-map .mexico-box {
+  .us-map .mexico-shape {
+    fill: var(--mexico-fill);
     stroke: #ffffff;
     stroke-width: 0.8;
-    cursor: pointer;
-    transition: stroke-width 120ms;
-  }
-  .us-map .mexico-box:hover {
-    stroke: var(--ink);
-    stroke-width: 1.5;
   }
   .us-map .mexico-label {
-    font-family: 'Open Sans', sans-serif;
-    font-size: 8.5px;
-    fill: var(--ink);
-    pointer-events: none;
-    font-weight: 500;
-  }
-  .us-map .mexico-section-label {
-    font-family: 'Open Sans', sans-serif;
-    font-size: 9px;
-    letter-spacing: 0.12em;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
     fill: var(--ink-muted);
     pointer-events: none;
+  }
+
+  /* label boxes (region + state) */
+  .lbl-bg {
+    fill: rgba(255,255,255,0.92);
+    stroke: var(--rule);
+    stroke-width: 0.5;
+  }
+  .lbl-text {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    fill: var(--ink);
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .lbl-leader {
+    fill: none;
+    stroke: var(--ink-muted);
+    stroke-width: 0.6;
+  }
+
+  /* border crossings */
+  .xing-marker {
+    fill: var(--orange);
+    stroke: #fff;
+    stroke-width: 1.4;
+  }
+  .xing-connector { fill: none; stroke: var(--orange); stroke-width: 0.8; }
+  .xing-card-bg {
+    fill: rgba(255,255,255,0.96);
+    stroke: var(--orange);
+    stroke-width: 0.8;
+  }
+  .xing-card-name {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 9.5px;
+    font-weight: 600;
+    fill: var(--ink);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .xing-card-vol {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--green);
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .xing-marker {
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: xing-pulse 1100ms cubic-bezier(.22,.61,.36,1) 1 both;
+    }
+    @keyframes xing-pulse {
+      0%   { transform: scale(0.2); opacity: 0; }
+      55%  { transform: scale(1.45); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
   }
 
   /* tooltip */
   .tooltip {
     position: absolute;
-    background: #1a1a1a;
-    color: #ffffff;
+    background: var(--ink);
+    color: #fff;
     padding: 8px 12px;
-    border-radius: 3px;
+    border-radius: 6px;
+    font-family: 'Open Sans', sans-serif;
     font-size: 12px;
+    font-weight: 400;
     pointer-events: none;
     opacity: 0;
     transition: opacity 100ms;
-    z-index: 10;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 40;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
     line-height: 1.4;
     white-space: nowrap;
     transform: translate(-50%, -100%);
+    font-variant-numeric: tabular-nums;
   }
   .tooltip strong {
+    font-family: 'Montserrat', sans-serif;
     font-size: 13px;
+    font-weight: 600;
     display: block;
     margin-bottom: 2px;
   }
-  .tooltip .tt-detail {
+  .tooltip .tt-detail { font-size: 11px; color: #ec7700; }
+
+  /* chart view */
+  .chart-svg {
+    width: 100%;
+    max-width: 80%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+  .chart-row-label {
     font-family: 'Open Sans', sans-serif;
-    font-size: 11px;
-    color: #ec7700;
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .chart-row-value {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-bar { cursor: pointer; transition: opacity 120ms; }
+  .chart-bar:hover { opacity: 0.85; }
+  .chart-empty {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 13px;
+    fill: var(--ink-muted);
+    text-anchor: middle;
   }
 
-  /* legend */
-  .legend {
-    margin-top: 12px;
-    padding-top: 14px;
-    border-top: 1px solid var(--rule);
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 16px;
-    align-items: center;
+  /* viz layout: legend on top, map/chart below */
+  .viz-layout {
+    display: block;
   }
-  .legend-bar-wrap {
+  .viz-layout.chart-active .legend-horizontal {
+    display: none;
+  }
+
+  /* horizontal legend above map */
+  .legend-horizontal {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 18px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
   }
   .legend-label {
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 10px;
-    letter-spacing: 0.12em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--ink-muted);
+    white-space: nowrap;
   }
-  .legend-bar {
+  .legend-mid {
     display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 240px;
+  }
+  .legend-bar-horiz {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
     height: 12px;
-    border-radius: 2px;
+    border-radius: 4px;
     overflow: hidden;
+    border: 1px solid var(--rule);
   }
-  .legend-bar > div { flex: 1; }
-  .legend-ends {
-    display: flex;
-    justify-content: space-between;
+  .legend-bar-horiz > div { flex: 1; }
+  .legend-ends-horiz {
     font-family: 'Open Sans', sans-serif;
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .legend-current {
     font-family: 'Open Sans', sans-serif;
     font-size: 10px;
+    font-weight: 600;
     color: var(--ink-soft);
-    text-align: right;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-left: 1px solid var(--rule);
+    padding-left: 14px;
+    white-space: nowrap;
   }
   .legend-current strong {
     display: block;
     font-family: 'Montserrat', sans-serif;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--ink);
+    text-transform: none;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+    line-height: 1.3;
   }
 
   .source {
     margin-top: 16px;
     font-family: 'Open Sans', sans-serif;
-    font-size: 10px;
+    font-size: 11px;
     color: var(--ink-muted);
     text-align: right;
   }
 
   @media print {
-    .controls { display: none; }
+    .controls, .viz-header { display: none; }
     body { background: white; }
   }
 </style>
@@ -258,16 +490,16 @@
 <div class="card">
 
   <div class="head">
-    <h1>Q3 Reefer Volume by Region — <span id="commodityName"></span></h1>
-    <div class="meta">2021–2024 4-yr avg · May 12, 2026</div>
+    <h1>Q3 Reefer Volume by Region — <span class="commodity-name" id="commodityName"></span></h1>
+    <div class="meta">2022–2025 4-yr avg · May 28, 2026</div>
   </div>
 
   <div class="controls">
-    <div>
+    <div class="ctrl-row">
       <label class="ctrl-label">Commodity</label>
       <div class="pill-row" id="commodityPills"></div>
     </div>
-    <div>
+    <div class="ctrl-row">
       <label class="ctrl-label">Q3 Month</label>
       <div class="pill-row" id="monthPills">
         <button class="pill active" data-month="all">Full Q3</button>
@@ -278,23 +510,42 @@
     </div>
   </div>
 
-  <div class="map-container">
-    <svg class="us-map" viewBox="0 0 975 730" preserveAspectRatio="xMidYMid meet">
-      <g id="statesG"></g>
-      <path class="nation" id="nationPath"></path>
-      <g id="labelsG"></g>
-      <g id="mexicoG"></g>
-    </svg>
-    <div class="tooltip" id="tooltip"></div>
+  <div class="viz-header">
+    <div class="viz-title">Regional Volume Distribution</div>
+    <div class="seg" role="tablist" aria-label="View toggle">
+      <button class="seg-btn active" data-view="map" role="tab" aria-selected="true">Map</button>
+      <button class="seg-btn" data-view="chart" role="tab" aria-selected="false">Chart</button>
+    </div>
   </div>
 
-  <div class="legend">
-    <div class="legend-bar-wrap">
+  <div class="viz-layout">
+    <div class="legend-horizontal">
       <div class="legend-label">Volume — Low → High</div>
-      <div class="legend-bar" id="legendBar"></div>
-      <div class="legend-ends" id="legendEnds"></div>
+      <div class="legend-mid">
+        <span class="legend-ends-horiz" id="legendLow">Low</span>
+        <div class="legend-bar-horiz" id="legendBar"></div>
+        <span class="legend-ends-horiz" id="legendHigh">High</span>
+      </div>
+      <div class="legend-current" id="legendCurrent"></div>
     </div>
-    <div class="legend-current" id="legendCurrent"></div>
+
+    <div class="viz-area">
+      <div class="viz-pane" id="mapPane">
+        <div class="map-container">
+          <svg class="us-map" viewBox="0 0 975 970" preserveAspectRatio="xMidYMid meet">
+            <g id="mexicoShapeG"></g>
+            <g id="statesG"></g>
+            <path class="nation" id="nationPath"></path>
+            <g id="labelsG"></g>
+            <g id="crossingsG"></g>
+          </svg>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+      </div>
+      <div class="viz-pane hidden" id="chartPane" aria-hidden="true">
+        <svg class="chart-svg" id="chartSvg" viewBox="0 0 960 560" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </div>
   </div>
 
   <div class="source">Source: USDA AMS Specialty Crops Movement Reports · agtransport.usda.gov/rfpn-7etz</div>
@@ -305,40 +556,37 @@
   // ═══════════════════════════════════════════════════════════════
   // INJECTED DATA
   // ═══════════════════════════════════════════════════════════════
-  const PRODUCTION = {"All Commodities": {"California": {"jul": 1100, "aug": 1380, "sep": 1240}, "PNW": {"jul": 340, "aug": 680, "sep": 920}, "Florida": {"jul": 95, "aug": 72, "sep": 88}, "Great Lakes": {"jul": 280, "aug": 420, "sep": 480}, "Mid-Atlantic": {"jul": 140, "aug": 180, "sep": 165}, "Southeast": {"jul": 220, "aug": 195, "sep": 175}, "Texas": {"jul": 95, "aug": 88, "sep": 110}, "Arizona": {"jul": 22, "aug": 18, "sep": 28}, "Colorado": {"jul": 42, "aug": 62, "sep": 82}, "New York": {"jul": 88, "aug": 140, "sep": 185}, "Mexico-Arizona": {"jul": 380, "aug": 420, "sep": 440}, "Mexico-California": {"jul": 140, "aug": 130, "sep": 110}, "Mexico-New Mexico": {"jul": 18, "aug": 22, "sep": 25}, "Mexico-Texas": {"jul": 580, "aug": 680, "sep": 720}}, "Potatoes": {"California": {"jul": 42, "aug": 58, "sep": 38}, "PNW": {"jul": 110, "aug": 220, "sep": 480}, "Great Lakes": {"jul": 28, "aug": 82, "sep": 180}, "Mid-Atlantic": {"jul": 8, "aug": 18, "sep": 28}, "Southeast": {"jul": 4, "aug": 6, "sep": 4}, "Texas": {"jul": 8, "aug": 4, "sep": 6}, "Colorado": {"jul": 12, "aug": 28, "sep": 82}, "New York": {"jul": 4, "aug": 18, "sep": 48}, "Mexico-Texas": {"jul": 3, "aug": 4, "sep": 2}, "Florida": {"jul": 0, "aug": 0, "sep": 0}, "Arizona": {"jul": 0, "aug": 0, "sep": 0}}, "Apples": {"California": {"jul": 8, "aug": 18, "sep": 32}, "PNW": {"jul": 88, "aug": 280, "sep": 620}, "Great Lakes": {"jul": 12, "aug": 48, "sep": 180}, "Mid-Atlantic": {"jul": 8, "aug": 32, "sep": 95}, "Southeast": {"jul": 4, "aug": 18, "sep": 62}, "Colorado": {"jul": 2, "aug": 6, "sep": 18}, "New York": {"jul": 8, "aug": 42, "sep": 140}}, "Onions, Dry": {"California": {"jul": 140, "aug": 88, "sep": 62}, "PNW": {"jul": 62, "aug": 180, "sep": 280}, "Great Lakes": {"jul": 18, "aug": 42, "sep": 58}, "Colorado": {"jul": 12, "aug": 22, "sep": 38}, "New York": {"jul": 8, "aug": 28, "sep": 48}, "Mexico-Texas": {"jul": 22, "aug": 18, "sep": 12}, "Mid-Atlantic": {"jul": 4, "aug": 8, "sep": 8}}, "Oranges": {"California": {"jul": 82, "aug": 62, "sep": 42}, "Florida": {"jul": 2, "aug": 1, "sep": 1}, "Texas": {"jul": 2, "aug": 1, "sep": 2}, "Arizona": {"jul": 1, "aug": 1, "sep": 1}}, "Tomatoes": {"California": {"jul": 420, "aug": 580, "sep": 520}, "PNW": {"jul": 12, "aug": 18, "sep": 14}, "Great Lakes": {"jul": 38, "aug": 62, "sep": 48}, "Mid-Atlantic": {"jul": 28, "aug": 38, "sep": 22}, "Southeast": {"jul": 22, "aug": 18, "sep": 14}, "Texas": {"jul": 6, "aug": 4, "sep": 8}, "Florida": {"jul": 2, "aug": 1, "sep": 3}, "Mexico-Arizona": {"jul": 82, "aug": 95, "sep": 88}, "Mexico-Texas": {"jul": 140, "aug": 180, "sep": 160}, "Mexico-California": {"jul": 28, "aug": 32, "sep": 28}, "New York": {"jul": 8, "aug": 18, "sep": 14}}, "Watermelons": {"California": {"jul": 82, "aug": 72, "sep": 32}, "Florida": {"jul": 18, "aug": 6, "sep": 4}, "Mid-Atlantic": {"jul": 12, "aug": 14, "sep": 6}, "Southeast": {"jul": 82, "aug": 58, "sep": 22}, "Texas": {"jul": 28, "aug": 18, "sep": 8}, "Mexico-Arizona": {"jul": 62, "aug": 42, "sep": 18}, "Mexico-Texas": {"jul": 82, "aug": 62, "sep": 28}, "Mexico-California": {"jul": 18, "aug": 14, "sep": 6}, "Great Lakes": {"jul": 8, "aug": 12, "sep": 4}, "PNW": {"jul": 4, "aug": 8, "sep": 2}}, "Grapes": {"California": {"jul": 220, "aug": 580, "sep": 680}, "PNW": {"jul": 8, "aug": 28, "sep": 88}, "Mexico-Arizona": {"jul": 32, "aug": 18, "sep": 4}, "New York": {"jul": 1, "aug": 8, "sep": 22}, "Great Lakes": {"jul": 1, "aug": 8, "sep": 28}}, "Cantaloupes": {"California": {"jul": 42, "aug": 62, "sep": 38}, "Arizona": {"jul": 4, "aug": 2, "sep": 6}, "Mexico-California": {"jul": 18, "aug": 12, "sep": 6}, "Mexico-Texas": {"jul": 12, "aug": 8, "sep": 4}, "Southeast": {"jul": 18, "aug": 8, "sep": 4}}, "Sweet Corn": {"California": {"jul": 42, "aug": 62, "sep": 38}, "PNW": {"jul": 18, "aug": 32, "sep": 28}, "Florida": {"jul": 4, "aug": 2, "sep": 8}, "Great Lakes": {"jul": 62, "aug": 98, "sep": 78}, "Mid-Atlantic": {"jul": 32, "aug": 42, "sep": 28}, "Southeast": {"jul": 28, "aug": 18, "sep": 12}, "New York": {"jul": 22, "aug": 32, "sep": 24}}, "Lettuce, Iceberg": {"California": {"jul": 140, "aug": 160, "sep": 140}, "Arizona": {"jul": 1, "aug": 1, "sep": 8}, "Colorado": {"jul": 8, "aug": 12, "sep": 14}, "PNW": {"jul": 12, "aug": 10, "sep": 8}}, "Peaches": {"California": {"jul": 82, "aug": 62, "sep": 18}, "Southeast": {"jul": 22, "aug": 14, "sep": 4}, "Colorado": {"jul": 4, "aug": 8, "sep": 2}, "Mid-Atlantic": {"jul": 8, "aug": 8, "sep": 2}, "Great Lakes": {"jul": 2, "aug": 4, "sep": 1}}, "Strawberries": {"California": {"jul": 62, "aug": 42, "sep": 28}, "Mexico-California": {"jul": 22, "aug": 28, "sep": 32}, "PNW": {"jul": 4, "aug": 2, "sep": 1}}, "Carrots": {"California": {"jul": 82, "aug": 82, "sep": 72}, "Mexico-Arizona": {"jul": 12, "aug": 10, "sep": 8}, "Colorado": {"jul": 4, "aug": 8, "sep": 12}, "PNW": {"jul": 8, "aug": 10, "sep": 12}, "Great Lakes": {"jul": 4, "aug": 8, "sep": 12}}, "Lettuce, Romaine": {"California": {"jul": 88, "aug": 98, "sep": 88}, "Arizona": {"jul": 1, "aug": 1, "sep": 4}, "Colorado": {"jul": 4, "aug": 8, "sep": 10}}, "Celery": {"California": {"jul": 78, "aug": 72, "sep": 62}, "Mexico-Arizona": {"jul": 2, "aug": 1, "sep": 1}}, "Broccoli": {"California": {"jul": 62, "aug": 68, "sep": 62}, "Mexico-California": {"jul": 8, "aug": 10, "sep": 8}, "Arizona": {"jul": 1, "aug": 1, "sep": 4}}, "Cucumbers": {"Mexico-Texas": {"jul": 28, "aug": 18, "sep": 12}, "California": {"jul": 18, "aug": 22, "sep": 18}, "Florida": {"jul": 4, "aug": 2, "sep": 8}, "Southeast": {"jul": 18, "aug": 12, "sep": 8}, "Mid-Atlantic": {"jul": 8, "aug": 10, "sep": 6}}, "Peppers, Bell Type": {"California": {"jul": 42, "aug": 52, "sep": 48}, "Mexico-Texas": {"jul": 28, "aug": 32, "sep": 28}, "Florida": {"jul": 4, "aug": 2, "sep": 8}, "Great Lakes": {"jul": 8, "aug": 12, "sep": 10}}, "Tomatoes, Plum Type": {"California": {"jul": 82, "aug": 110, "sep": 98}, "Mexico-Texas": {"jul": 38, "aug": 48, "sep": 42}, "Mexico-Arizona": {"jul": 22, "aug": 28, "sep": 24}}, "Cabbage": {"California": {"jul": 28, "aug": 22, "sep": 18}, "New York": {"jul": 8, "aug": 14, "sep": 18}, "PNW": {"jul": 12, "aug": 14, "sep": 10}, "Great Lakes": {"jul": 8, "aug": 12, "sep": 12}, "Southeast": {"jul": 4, "aug": 4, "sep": 8}}};      // {commodity: {region: {jul,aug,sep}}}
-  const COMMODITIES = ["All Commodities", "Potatoes", "Apples", "Onions, Dry", "Oranges", "Tomatoes", "Watermelons", "Grapes", "Cantaloupes", "Sweet Corn", "Lettuce, Iceberg", "Peaches", "Strawberries", "Carrots", "Lettuce, Romaine", "Celery", "Broccoli", "Cucumbers", "Peppers, Bell Type", "Tomatoes, Plum Type", "Cabbage"];    // ordered list
+  const PRODUCTION = {"All Commodities": {"Mexico-California": {"jul": 364.83, "aug": 332.43, "sep": 304.31}, "Mexico-Texas": {"jul": 978.54, "aug": 968.4, "sep": 914.81}, "Mexico-Arizona": {"jul": 214.34, "aug": 124.88, "sep": 113.66}, "Arizona": {"jul": 174.96, "aug": 25.7, "sep": 8.26}, "Florida": {"jul": 31.05, "aug": 7.17, "sep": 7.54}, "Southeast": {"jul": 484.83, "aug": 171.62, "sep": 60.85}, "California": {"jul": 1993.02, "aug": 2197.77, "sep": 1829.97}, "Great Lakes": {"jul": 231.27, "aug": 455.83, "sep": 311.94}, "Texas": {"jul": 103.96, "aug": 100.3, "sep": 55.66}, "Mexico-New Mexico": {"jul": 55.36, "aug": 55.86, "sep": 55.27}, "Mid-Atlantic": {"jul": 98.02, "aug": 165.4, "sep": 78.61}, "Colorado": {"jul": 100.98, "aug": 44.08, "sep": 130.66}, "PNW": {"jul": 781.82, "aug": 875.43, "sep": 967.52}, "New York": {"jul": 28.31, "aug": 64.03, "sep": 82.37}}, "Watermelons": {"Mexico-California": {"jul": 5.74, "aug": 3.82, "sep": 3.29}, "Mexico-Texas": {"jul": 38.82, "aug": 31.05, "sep": 20.79}, "Mexico-Arizona": {"jul": 18.01, "aug": 1.35, "sep": 1.22}, "Arizona": {"jul": 89.54, "aug": 13.07, "sep": 0.0}, "Florida": {"jul": 12.31, "aug": 0.19, "sep": 0.0}, "Southeast": {"jul": 342.91, "aug": 101.8, "sep": 11.54}, "California": {"jul": 177.13, "aug": 193.58, "sep": 112.62}, "Great Lakes": {"jul": 116.39, "aug": 255.02, "sep": 97.3}, "Texas": {"jul": 66.75, "aug": 49.43, "sep": 24.38}, "Mexico-New Mexico": {"jul": 5.23, "aug": 4.81, "sep": 2.9}, "Mid-Atlantic": {"jul": 38.19, "aug": 135.62, "sep": 51.19}}, "Potatoes": {"Colorado": {"jul": 100.98, "aug": 42.12, "sep": 115.8}, "PNW": {"jul": 291.09, "aug": 305.43, "sep": 317.68}, "Great Lakes": {"jul": 44.84, "aug": 98.67, "sep": 124.32}, "Southeast": {"jul": 7.69, "aug": 0.09, "sep": 0.0}, "California": {"jul": 60.36, "aug": 36.99, "sep": 28.66}, "Texas": {"jul": 34.65, "aug": 50.87, "sep": 31.28}, "Arizona": {"jul": 10.11, "aug": 0.23, "sep": 0.0}, "Mid-Atlantic": {"jul": 40.22, "aug": 8.63, "sep": 0.66}, "Florida": {"jul": 6.01, "aug": 0.0, "sep": 0.0}}, "Apples": {"Mid-Atlantic": {"jul": 5.45, "aug": 9.98, "sep": 17.03}, "Great Lakes": {"jul": 10.24, "aug": 11.69, "sep": 26.64}, "New York": {"jul": 13.89, "aug": 13.55, "sep": 31.06}, "PNW": {"jul": 279.75, "aug": 333.68, "sep": 320.83}, "California": {"jul": 0.55, "aug": 3.56, "sep": 5.73}, "Southeast": {"jul": 0.0, "aug": 0.6, "sep": 1.6}}, "Onions, Dry": {"Mexico-New Mexico": {"jul": 29.04, "aug": 5.51, "sep": 0.0}, "Mexico-Arizona": {"jul": 0.75, "aug": 0.21, "sep": 0.26}, "Mexico-California": {"jul": 3.5, "aug": 1.77, "sep": 1.11}, "Mexico-Texas": {"jul": 23.23, "aug": 11.02, "sep": 4.05}, "Southeast": {"jul": 43.83, "aug": 28.87, "sep": 12.83}, "California": {"jul": 99.32, "aug": 68.41, "sep": 14.29}, "Great Lakes": {"jul": 0.64, "aug": 0.0, "sep": 4.74}, "Texas": {"jul": 2.56, "aug": 0.0, "sep": 0.0}, "PNW": {"jul": 23.9, "aug": 155.87, "sep": 271.49}, "Colorado": {"jul": 0.0, "aug": 1.96, "sep": 14.86}, "New York": {"jul": 0.12, "aug": 4.75, "sep": 5.26}}, "Grapes": {"California": {"jul": 134.35, "aug": 301.65, "sep": 304.21}, "Mexico-Arizona": {"jul": 32.01, "aug": 0.24, "sep": 0.02}, "Mexico-Texas": {"jul": 1.17, "aug": 0.11, "sep": 0.24}, "Mexico-California": {"jul": 0.0, "aug": 0.36, "sep": 0.19}}, "Strawberries": {"Mexico-California": {"jul": 12.47, "aug": 0.43, "sep": 0.12}, "California": {"jul": 252.99, "aug": 222.69, "sep": 188.82}, "Mexico-Arizona": {"jul": 0.39, "aug": 0.0, "sep": 0.0}, "Mexico-Texas": {"jul": 2.41, "aug": 1.51, "sep": 0.85}}, "Avocados": {"Mexico-Texas": {"jul": 119.98, "aug": 140.53, "sep": 169.58}, "Mexico-Arizona": {"jul": 1.84, "aug": 2.38, "sep": 3.21}, "Mexico-California": {"jul": 1.22, "aug": 1.44, "sep": 1.52}, "Florida": {"jul": 5.06, "aug": 5.81, "sep": 4.56}, "California": {"jul": 51.67, "aug": 30.98, "sep": 11.62}}, "Lettuce, Iceberg": {"Mexico-Texas": {"jul": 7.01, "aug": 5.98, "sep": 6.29}, "Mexico-Arizona": {"jul": 2.36, "aug": 2.49, "sep": 2.37}, "California": {"jul": 170.35, "aug": 176.19, "sep": 162.6}, "Mexico-California": {"jul": 0.05, "aug": 0.04, "sep": 0.07}}, "Cantaloupes": {"Arizona": {"jul": 54.09, "aug": 9.93, "sep": 6.22}, "Southeast": {"jul": 3.86, "aug": 0.0, "sep": 0.0}, "California": {"jul": 120.7, "aug": 180.98, "sep": 138.52}, "Great Lakes": {"jul": 10.29, "aug": 9.72, "sep": 0.57}, "Mexico-California": {"jul": 0.05, "aug": 0.05, "sep": 0.04}, "Mexico-Arizona": {"jul": 0.23, "aug": 0.0, "sep": 0.0}, "Mexico-Texas": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Mid-Atlantic": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Tomatoes, Plum Type": {"Florida": {"jul": 0.13, "aug": 0.0, "sep": 0.0}, "Mexico-Texas": {"jul": 83.9, "aug": 90.32, "sep": 79.0}, "Mexico-Arizona": {"jul": 14.36, "aug": 4.27, "sep": 3.58}, "Mexico-California": {"jul": 59.72, "aug": 61.08, "sep": 48.71}, "California": {"jul": 18.74, "aug": 19.55, "sep": 19.15}, "Southeast": {"jul": 0.58, "aug": 0.47, "sep": 0.18}, "Great Lakes": {"jul": 0.23, "aug": 3.31, "sep": 3.98}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.05, "sep": 0.0}}, "Lettuce, Romaine": {"California": {"jul": 154.56, "aug": 159.24, "sep": 146.92}, "Mexico-Arizona": {"jul": 2.68, "aug": 3.24, "sep": 2.87}, "Mexico-Texas": {"jul": 1.07, "aug": 1.15, "sep": 0.98}, "Mexico-California": {"jul": 0.46, "aug": 0.45, "sep": 0.49}}, "Tomatoes": {"Florida": {"jul": 2.68, "aug": 0.0, "sep": 0.0}, "Mexico-Texas": {"jul": 51.77, "aug": 59.6, "sep": 71.25}, "Mexico-Arizona": {"jul": 14.57, "aug": 13.32, "sep": 19.08}, "Mexico-California": {"jul": 21.08, "aug": 18.83, "sep": 13.14}, "California": {"jul": 51.97, "aug": 48.76, "sep": 40.75}, "Southeast": {"jul": 8.32, "aug": 1.23, "sep": 1.29}, "Mid-Atlantic": {"jul": 9.6, "aug": 5.15, "sep": 6.91}, "Great Lakes": {"jul": 0.11, "aug": 1.1, "sep": 1.27}, "Mexico-New Mexico": {"jul": 0.08, "aug": 0.0, "sep": 0.0}}, "Limes": {"Mexico-Texas": {"jul": 125.89, "aug": 119.16, "sep": 110.07}, "Mexico-Arizona": {"jul": 1.29, "aug": 1.81, "sep": 1.4}, "Mexico-California": {"jul": 16.57, "aug": 16.91, "sep": 16.09}, "Mexico-New Mexico": {"jul": 0.04, "aug": 0.02, "sep": 0.04}}, "Cucumbers": {"Mexico-Texas": {"jul": 47.47, "aug": 46.97, "sep": 52.41}, "Mexico-Arizona": {"jul": 18.96, "aug": 11.71, "sep": 12.42}, "Mexico-California": {"jul": 53.86, "aug": 49.76, "sep": 45.21}, "Southeast": {"jul": 2.52, "aug": 0.96, "sep": 3.82}, "Great Lakes": {"jul": 10.81, "aug": 18.04, "sep": 9.86}, "Florida": {"jul": 0.0, "aug": 0.0, "sep": 0.66}, "New York": {"jul": 2.53, "aug": 10.6, "sep": 7.27}, "Mexico-New Mexico": {"jul": 0.09, "aug": 0.18, "sep": 0.14}}, "Mangoes": {"Mexico-Texas": {"jul": 105.07, "aug": 89.38, "sep": 38.97}, "Mexico-Arizona": {"jul": 50.46, "aug": 48.5, "sep": 29.88}, "Mexico-California": {"jul": 1.27, "aug": 1.1, "sep": 0.73}}, "Oranges": {"Mexico-Arizona": {"jul": 1.42, "aug": 0.02, "sep": 0.0}, "Mexico-Texas": {"jul": 0.82, "aug": 0.23, "sep": 0.39}, "Florida": {"jul": 1.24, "aug": 0.05, "sep": 0.41}, "California": {"jul": 113.55, "aug": 113.55, "sep": 113.55}}, "Celery": {"Mexico-Texas": {"jul": 8.4, "aug": 6.78, "sep": 6.9}, "Mexico-Arizona": {"jul": 0.4, "aug": 0.35, "sep": 0.36}, "Mexico-California": {"jul": 0.97, "aug": 0.64, "sep": 0.56}, "California": {"jul": 90.55, "aug": 88.87, "sep": 91.0}, "Great Lakes": {"jul": 3.66, "aug": 9.09, "sep": 8.12}}, "Peppers, Bell Type": {"Mexico-Texas": {"jul": 37.78, "aug": 36.27, "sep": 40.09}, "Mexico-Arizona": {"jul": 7.25, "aug": 5.78, "sep": 7.85}, "Mexico-California": {"jul": 5.79, "aug": 4.54, "sep": 2.23}, "Southeast": {"jul": 10.68, "aug": 1.76, "sep": 1.19}, "California": {"jul": 32.98, "aug": 34.52, "sep": 35.27}, "Great Lakes": {"jul": 4.85, "aug": 17.0, "sep": 18.98}}, "Lemons": {"Mexico-Texas": {"jul": 4.05, "aug": 13.77, "sep": 14.06}, "California": {"jul": 70.02, "aug": 70.46, "sep": 70.03}, "Mexico-Arizona": {"jul": 0.16, "aug": 0.6, "sep": 2.15}, "Mexico-California": {"jul": 0.91, "aug": 0.53, "sep": 0.16}}, "Honeydews": {"Mexico-Arizona": {"jul": 8.47, "aug": 0.12, "sep": 0.0}, "Mexico-California": {"jul": 0.41, "aug": 0.35, "sep": 0.21}, "Arizona": {"jul": 11.49, "aug": 2.17, "sep": 1.64}, "California": {"jul": 45.91, "aug": 76.54, "sep": 59.45}, "Mexico-Texas": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.19, "sep": 0.0}}, "Broccoli": {"Mexico-California": {"jul": 1.19, "aug": 1.59, "sep": 1.65}, "Mexico-Texas": {"jul": 23.37, "aug": 21.57, "sep": 22.9}, "Mexico-Arizona": {"jul": 0.69, "aug": 0.72, "sep": 0.64}, "California": {"jul": 42.91, "aug": 42.08, "sep": 36.99}}, "Peaches": {"California": {"jul": 46.88, "aug": 57.76, "sep": 37.39}, "Southeast": {"jul": 17.35, "aug": 7.57, "sep": 0.0}, "Mid-Atlantic": {"jul": 1.39, "aug": 2.98, "sep": 0.24}, "PNW": {"jul": 0.76, "aug": 6.73, "sep": 5.16}}, "Cherries": {"PNW": {"jul": 140.86, "aug": 36.38, "sep": 0.88}, "California": {"jul": 0.21, "aug": 0.0, "sep": 0.0}}, "Cabbage": {"Mexico-Texas": {"jul": 8.49, "aug": 7.32, "sep": 7.81}, "Mexico-California": {"jul": 0.11, "aug": 0.05, "sep": 0.15}, "Mexico-Arizona": {"jul": 2.29, "aug": 2.13, "sep": 1.93}, "California": {"jul": 11.44, "aug": 10.56, "sep": 9.88}, "Southeast": {"jul": 3.81, "aug": 0.5, "sep": 0.48}, "Great Lakes": {"jul": 10.71, "aug": 8.43, "sep": 6.78}, "New York": {"jul": 8.09, "aug": 22.73, "sep": 26.57}}, "Peppers, Jalapeno": {"Mexico-Arizona": {"jul": 3.72, "aug": 1.07, "sep": 0.55}, "Southeast": {"jul": 0.33, "aug": 0.36, "sep": 0.04}, "Mexico-Texas": {"jul": 14.77, "aug": 13.62, "sep": 11.77}, "Mexico-New Mexico": {"jul": 9.67, "aug": 20.76, "sep": 19.08}, "Mexico-California": {"jul": 12.11, "aug": 10.59, "sep": 10.27}}, "Pears": {"PNW": {"jul": 14.13, "aug": 10.07, "sep": 44.04}, "California": {"jul": 8.09, "aug": 28.49, "sep": 21.79}}, "Papaya": {"Mexico-California": {"jul": 14.15, "aug": 13.52, "sep": 13.63}, "Mexico-Texas": {"jul": 26.32, "aug": 26.84, "sep": 25.4}, "Mexico-Arizona": {"jul": 0.0, "aug": 0.0, "sep": 0.04}}, "Cauliflower": {"Mexico-California": {"jul": 0.5, "aug": 0.67, "sep": 0.58}, "Mexico-Texas": {"jul": 4.46, "aug": 5.51, "sep": 6.58}, "California": {"jul": 34.42, "aug": 34.12, "sep": 30.42}, "Mexico-Arizona": {"jul": 0.24, "aug": 0.23, "sep": 0.21}}, "Peppers, Other": {"Mexico-California": {"jul": 8.17, "aug": 6.75, "sep": 5.52}, "Mexico-Arizona": {"jul": 1.58, "aug": 0.97, "sep": 0.68}, "Mexico-Texas": {"jul": 15.95, "aug": 13.62, "sep": 12.11}, "Mexico-New Mexico": {"jul": 4.01, "aug": 13.23, "sep": 23.46}, "Southeast": {"jul": 0.0, "aug": 0.0, "sep": 0.02}}, "Onions, Green": {"Mexico-California": {"jul": 31.59, "aug": 25.0, "sep": 21.62}, "Mexico-Arizona": {"jul": 1.08, "aug": 0.74, "sep": 0.58}, "Mexico-Texas": {"jul": 5.44, "aug": 5.13, "sep": 4.73}, "Mexico-New Mexico": {"jul": 2.82, "aug": 1.57, "sep": 0.01}, "Southeast": {"jul": 1.51, "aug": 1.23, "sep": 1.47}, "California": {"jul": 0.27, "aug": 0.31, "sep": 0.2}}, "Nectarines": {"California": {"jul": 42.94, "aug": 41.6, "sep": 16.38}, "Mid-Atlantic": {"jul": 0.16, "aug": 0.1, "sep": 0.02}, "PNW": {"jul": 0.0, "aug": 0.07, "sep": 0.12}}, "Blueberries": {"Mexico-Texas": {"jul": 0.67, "aug": 0.2, "sep": 0.73}, "Mexico-California": {"jul": 1.07, "aug": 0.03, "sep": 0.33}, "California": {"jul": 1.05, "aug": 0.07, "sep": 0.39}, "Southeast": {"jul": 0.91, "aug": 0.0, "sep": 0.0}, "PNW": {"jul": 31.27, "aug": 27.2, "sep": 6.53}, "Great Lakes": {"jul": 12.86, "aug": 12.08, "sep": 2.8}, "Mexico-Arizona": {"jul": 0.0, "aug": 0.01, "sep": 0.0}, "Florida": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Tomatoes, Grape Type": {"Florida": {"jul": 0.73, "aug": 0.0, "sep": 0.69}, "Mexico-Texas": {"jul": 16.51, "aug": 18.76, "sep": 21.88}, "Mexico-Arizona": {"jul": 5.24, "aug": 6.34, "sep": 6.26}, "Mexico-California": {"jul": 6.67, "aug": 3.69, "sep": 3.54}, "Mid-Atlantic": {"jul": 2.39, "aug": 2.28, "sep": 2.0}, "Southeast": {"jul": 0.08, "aug": 0.18, "sep": 0.14}, "Great Lakes": {"jul": 0.03, "aug": 0.24, "sep": 0.29}, "Mexico-New Mexico": {"jul": 0.17, "aug": 0.03, "sep": 0.0}}, "Tomatillos": {"Mexico-Arizona": {"jul": 0.38, "aug": 0.03, "sep": 0.09}, "Mexico-New Mexico": {"jul": 0.79, "aug": 0.16, "sep": 0.15}, "Mexico-California": {"jul": 15.44, "aug": 14.3, "sep": 13.81}, "Mexico-Texas": {"jul": 16.72, "aug": 17.33, "sep": 16.28}}, "Corn, Sweet": {"Mexico-Texas": {"jul": 4.08, "aug": 4.75, "sep": 3.86}, "Mexico-California": {"jul": 1.66, "aug": 1.66, "sep": 1.67}, "California": {"jul": 16.86, "aug": 10.01, "sep": 8.99}, "Southeast": {"jul": 10.37, "aug": 0.2, "sep": 0.35}, "Mexico-Arizona": {"jul": 0.22, "aug": 0.16, "sep": 0.18}, "Great Lakes": {"jul": 1.02, "aug": 4.59, "sep": 1.96}, "New York": {"jul": 1.66, "aug": 7.19, "sep": 8.34}, "Florida": {"jul": 1.61, "aug": 0.0, "sep": 0.0}, "Arizona": {"jul": 3.51, "aug": 0.0, "sep": 0.0}, "Mexico-New Mexico": {"jul": 0.04, "aug": 0.0, "sep": 0.0}}, "Bananas": {"Mexico-California": {"jul": 4.73, "aug": 4.72, "sep": 4.3}, "Mexico-Texas": {"jul": 24.05, "aug": 23.5, "sep": 22.32}, "Mexico-Arizona": {"jul": 2.96, "aug": 2.64, "sep": 2.5}, "Mexico-New Mexico": {"jul": 0.05, "aug": 0.06, "sep": 0.08}}, "Raspberries": {"Mexico-Texas": {"jul": 3.28, "aug": 3.0, "sep": 7.66}, "Mexico-California": {"jul": 6.39, "aug": 10.43, "sep": 9.43}, "California": {"jul": 18.87, "aug": 14.45, "sep": 12.95}, "Mexico-Arizona": {"jul": 0.03, "aug": 0.0, "sep": 0.0}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Sweet Potatoes": {"Southeast": {"jul": 24.29, "aug": 23.83, "sep": 21.44}, "California": {"jul": 5.01, "aug": 4.48, "sep": 4.19}}, "Carrots": {"Mexico-Texas": {"jul": 29.43, "aug": 27.38, "sep": 16.34}, "Mexico-California": {"jul": 1.41, "aug": 1.81, "sep": 1.82}, "Mexico-Arizona": {"jul": 1.0, "aug": 0.36, "sep": 0.29}, "California": {"jul": 0.24, "aug": 0.18, "sep": 0.09}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.01}}, "Grapefruit": {"Mexico-Texas": {"jul": 0.09, "aug": 0.12, "sep": 0.03}, "California": {"jul": 26.46, "aug": 26.46, "sep": 26.46}}, "Lettuce, Other": {"Mexico-California": {"jul": 1.59, "aug": 1.88, "sep": 1.92}, "Mexico-Texas": {"jul": 20.69, "aug": 20.95, "sep": 21.93}, "Mexico-Arizona": {"jul": 3.55, "aug": 2.81, "sep": 2.49}, "California": {"jul": 0.18, "aug": 0.46, "sep": 0.0}}, "Cilantro": {"Mexico-California": {"jul": 0.47, "aug": 0.41, "sep": 0.39}, "Mexico-Texas": {"jul": 13.52, "aug": 15.06, "sep": 13.69}, "Mexico-Arizona": {"jul": 0.02, "aug": 0.08, "sep": 0.0}, "California": {"jul": 9.02, "aug": 9.28, "sep": 9.02}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Asparagus": {"Mexico-California": {"jul": 15.59, "aug": 12.97, "sep": 15.26}, "Mexico-Texas": {"jul": 7.05, "aug": 5.31, "sep": 1.69}, "Mexico-Arizona": {"jul": 0.93, "aug": 1.01, "sep": 0.63}, "Great Lakes": {"jul": 0.64, "aug": 0.0, "sep": 0.0}, "PNW": {"jul": 0.06, "aug": 0.0, "sep": 0.0}}, "Blackberries": {"Mexico-Texas": {"jul": 0.91, "aug": 1.16, "sep": 3.83}, "Mexico-California": {"jul": 0.26, "aug": 0.14, "sep": 0.32}, "Southeast": {"jul": 2.01, "aug": 0.48, "sep": 0.14}, "California": {"jul": 12.65, "aug": 16.96, "sep": 13.9}, "Mexico-Arizona": {"jul": 0.06, "aug": 0.0, "sep": 0.0}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Plums": {"California": {"jul": 17.14, "aug": 19.12, "sep": 12.35}, "Mexico-California": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "PNW": {"jul": 0.0, "aug": 0.0, "sep": 0.79}, "Mexico-Texas": {"jul": 0.0, "aug": 0.0, "sep": 0.04}}, "Brussels Sprouts": {"Mexico-California": {"jul": 6.38, "aug": 2.37, "sep": 1.75}, "Mexico-Texas": {"jul": 0.38, "aug": 0.17, "sep": 0.07}, "Mexico-Arizona": {"jul": 0.95, "aug": 0.24, "sep": 0.21}, "California": {"jul": 9.82, "aug": 12.19, "sep": 11.39}}, "Okra": {"Mexico-Texas": {"jul": 17.75, "aug": 13.16, "sep": 9.07}, "Florida": {"jul": 1.27, "aug": 1.12, "sep": 1.16}}, "Beans": {"Mexico-Arizona": {"jul": 2.41, "aug": 2.21, "sep": 2.34}, "Mexico-California": {"jul": 6.24, "aug": 5.31, "sep": 4.18}, "Mexico-Texas": {"jul": 3.34, "aug": 2.99, "sep": 2.29}, "New York": {"jul": 2.02, "aug": 5.21, "sep": 3.87}, "Southeast": {"jul": 0.19, "aug": 0.24, "sep": 0.16}}, "Lettuce, Green Leaf": {"California": {"jul": 10.6, "aug": 11.19, "sep": 10.07}}, "Vegetables Other": {"Mexico-Texas": {"jul": 7.34, "aug": 8.14, "sep": 8.42}, "Mexico-California": {"jul": 1.47, "aug": 1.69, "sep": 2.1}, "Mexico-Arizona": {"jul": 1.1, "aug": 0.57, "sep": 0.77}, "Mexico-New Mexico": {"jul": 0.03, "aug": 0.03, "sep": 0.04}}, "Coconuts": {"Mexico-California": {"jul": 2.99, "aug": 3.1, "sep": 2.79}, "Mexico-Texas": {"jul": 6.53, "aug": 6.03, "sep": 5.66}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Mexico-Arizona": {"jul": 0.03, "aug": 0.01, "sep": 0.03}}, "Peppers, Serrano": {"Mexico-Arizona": {"jul": 0.5, "aug": 0.12, "sep": 0.07}, "Mexico-New Mexico": {"jul": 0.13, "aug": 0.2, "sep": 0.21}, "Mexico-California": {"jul": 5.22, "aug": 4.84, "sep": 3.99}, "Mexico-Texas": {"jul": 4.07, "aug": 3.98, "sep": 3.53}, "Southeast": {"jul": 0.0, "aug": 0.0, "sep": 0.06}}, "Squash": {"Mexico-California": {"jul": 4.46, "aug": 4.31, "sep": 3.92}, "Mexico-Texas": {"jul": 3.85, "aug": 4.03, "sep": 4.47}, "Mexico-Arizona": {"jul": 0.55, "aug": 0.02, "sep": 0.2}, "Southeast": {"jul": 0.01, "aug": 0.0, "sep": 0.0}}, "Cactus Leaf (nopales)": {"Mexico-Texas": {"jul": 4.29, "aug": 4.5, "sep": 4.07}, "Mexico-California": {"jul": 3.95, "aug": 3.75, "sep": 3.35}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Mexico-Arizona": {"jul": 0.04, "aug": 0.08, "sep": 0.04}}, "Peppers, Anaheim": {"Mexico-Texas": {"jul": 0.5, "aug": 0.51, "sep": 0.43}, "Mexico-Arizona": {"jul": 1.94, "aug": 0.45, "sep": 0.33}, "Mexico-California": {"jul": 1.04, "aug": 0.53, "sep": 0.27}, "Mexico-New Mexico": {"jul": 1.88, "aug": 7.76, "sep": 8.36}}, "Squash, Zucchini": {"Southeast": {"jul": 0.78, "aug": 0.42, "sep": 1.56}, "Mexico-Arizona": {"jul": 0.41, "aug": 0.27, "sep": 1.21}, "Great Lakes": {"jul": 3.64, "aug": 4.5, "sep": 2.4}, "Mexico-California": {"jul": 2.5, "aug": 2.64, "sep": 1.77}, "Mexico-Texas": {"jul": 0.52, "aug": 0.47, "sep": 0.56}, "Florida": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Spinach": {"Mexico-California": {"jul": 0.11, "aug": 0.09, "sep": 0.1}, "Mexico-Texas": {"jul": 0.59, "aug": 0.71, "sep": 0.61}, "Mexico-Arizona": {"jul": 2.42, "aug": 2.61, "sep": 2.36}, "California": {"jul": 4.48, "aug": 4.42, "sep": 4.34}}, "Olives": {"Mexico-California": {"jul": 0.0, "aug": 5.58, "sep": 17.02}}, "Pineapples": {"Mexico-Arizona": {"jul": 0.23, "aug": 0.14, "sep": 0.14}, "Mexico-Texas": {"jul": 5.96, "aug": 6.38, "sep": 7.14}, "Mexico-California": {"jul": 0.15, "aug": 0.37, "sep": 0.37}}, "Chayote": {"Mexico-California": {"jul": 2.09, "aug": 3.33, "sep": 3.55}, "Mexico-Texas": {"jul": 2.4, "aug": 4.05, "sep": 4.27}}, "Jicama": {"Mexico-California": {"jul": 4.23, "aug": 3.69, "sep": 3.23}, "Mexico-Texas": {"jul": 3.15, "aug": 2.7, "sep": 2.49}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Mexico-Arizona": {"jul": 0.01, "aug": 0.0, "sep": 0.0}}, "Cactus Pears": {"Mexico-California": {"jul": 1.74, "aug": 3.44, "sep": 3.4}, "Mexico-Texas": {"jul": 2.63, "aug": 3.71, "sep": 4.02}, "Mexico-New Mexico": {"jul": 0.0, "aug": 0.0, "sep": 0.01}}, "Eggplant": {"Mexico-Arizona": {"jul": 1.68, "aug": 0.77, "sep": 0.65}, "Mexico-California": {"jul": 0.46, "aug": 0.96, "sep": 0.56}, "Mexico-Texas": {"jul": 1.67, "aug": 1.78, "sep": 1.91}, "Southeast": {"jul": 1.88, "aug": 0.11, "sep": 1.77}, "Great Lakes": {"jul": 0.31, "aug": 2.35, "sep": 1.93}, "California": {"jul": 0.0, "aug": 0.0, "sep": 0.0}, "Florida": {"jul": 0.0, "aug": 0.0, "sep": 0.0}}, "Melon, Hami": {"Arizona": {"jul": 1.84, "aug": 0.3, "sep": 0.0}, "California": {"jul": 7.11, "aug": 5.38, "sep": 3.77}, "Mexico-California": {"jul": 0.06, "aug": 0.0, "sep": 0.02}}, "Radishes": {"Mexico-California": {"jul": 2.47, "aug": 2.31, "sep": 2.07}, "Mexico-Texas": {"jul": 1.37, "aug": 1.42, "sep": 1.55}, "California": {"jul": 2.53, "aug": 2.19, "sep": 2.32}, "Mexico-Arizona": {"jul": 0.02, "aug": 0.02, "sep": 0.01}}, "Garlic": {"Mexico-California": {"jul": 5.61, "aug": 2.27, "sep": 0.3}, "Mexico-Arizona": {"jul": 0.74, "aug": 0.25, "sep": 0.04}, "Mexico-Texas": {"jul": 2.78, "aug": 1.6, "sep": 1.41}, "Mexico-New Mexico": {"jul": 1.27, "aug": 1.23, "sep": 0.71}}, "Artichokes": {"California": {"jul": 6.28, "aug": 5.6, "sep": 5.22}}, "Tomatoes, Cherry": {"Florida": {"jul": 0.01, "aug": 0.0, "sep": 0.06}, "Mexico-California": {"jul": 1.97, "aug": 1.98, "sep": 1.35}, "Mexico-Texas": {"jul": 2.13, "aug": 2.84, "sep": 2.75}, "Mid-Atlantic": {"jul": 0.62, "aug": 0.66, "sep": 0.56}, "Mexico-Arizona": {"jul": 0.57, "aug": 0.6, "sep": 0.63}, "Southeast": {"jul": 0.0, "aug": 0.01, "sep": 0.01}}, "Peppers, Poblano": {"Mexico-Arizona": {"jul": 0.5, "aug": 0.17, "sep": 0.08}, "Mexico-California": {"jul": 1.33, "aug": 0.91, "sep": 0.12}, "Mexico-Texas": {"jul": 4.39, "aug": 4.76, "sep": 4.04}, "Mexico-New Mexico": {"jul": 0.02, "aug": 0.07, "sep": 0.07}}, "Bok Choy": {"Mexico-California": {"jul": 0.01, "aug": 0.04, "sep": 0.02}, "Mexico-Texas": {"jul": 3.05, "aug": 4.32, "sep": 4.06}, "California": {"jul": 1.49, "aug": 1.55, "sep": 1.16}, "Mexico-Arizona": {"jul": 0.05, "aug": 0.04, "sep": 0.14}}, "Mixed and Misc Melons": {"Arizona": {"jul": 4.38, "aug": 0.0, "sep": 0.4}, "California": {"jul": 2.83, "aug": 5.56, "sep": 1.31}, "Mexico-California": {"jul": 0.07, "aug": 0.17, "sep": 0.12}, "Mexico-Texas": {"jul": 0.01, "aug": 0.0, "sep": 0.04}}, "Fruits Other": {"Mexico-California": {"jul": 0.09, "aug": 4.05, "sep": 5.99}, "Mexico-Texas": {"jul": 0.99, "aug": 2.03, "sep": 1.71}}, "Greens, Kale": {"Mexico-Arizona": {"jul": 0.5, "aug": 0.57, "sep": 0.61}, "California": {"jul": 3.79, "aug": 3.07, "sep": 2.92}, "Southeast": {"jul": 0.92, "aug": 0.71, "sep": 0.76}, "Mexico-California": {"jul": 0.14, "aug": 0.25, "sep": 0.25}, "Mexico-Texas": {"jul": 0.02, "aug": 0.02, "sep": 0.02}}, "Jackfruit": {"Mexico-California": {"jul": 2.75, "aug": 2.07, "sep": 1.56}, "Mexico-Texas": {"jul": 3.38, "aug": 2.43, "sep": 1.86}, "Mexico-Arizona": {"jul": 0.08, "aug": 0.03, "sep": 0.02}}, "Chinese Cabbage": {"California": {"jul": 3.75, "aug": 3.71, "sep": 2.89}, "Mexico-Arizona": {"jul": 0.01, "aug": 0.02, "sep": 0.04}, "Mexico-Texas": {"jul": 0.81, "aug": 0.71, "sep": 0.86}, "Mexico-California": {"jul": 0.13, "aug": 0.07, "sep": 0.08}}};      // {commodity: {region: {jul,aug,sep}}}
+  const COMMODITIES = ["All Commodities", "Watermelons", "Potatoes", "Apples", "Onions, Dry", "Grapes", "Strawberries", "Avocados", "Lettuce, Iceberg", "Cantaloupes", "Tomatoes, Plum Type", "Lettuce, Romaine", "Tomatoes", "Limes", "Cucumbers", "Mangoes", "Oranges", "Celery", "Peppers, Bell Type", "Lemons", "Honeydews", "Broccoli", "Peaches", "Cherries", "Cabbage", "Peppers, Jalapeno", "Pears", "Papaya", "Cauliflower", "Peppers, Other", "Onions, Green", "Nectarines", "Blueberries", "Tomatoes, Grape Type", "Tomatillos", "Corn, Sweet", "Bananas", "Raspberries", "Sweet Potatoes", "Carrots", "Grapefruit", "Lettuce, Other", "Cilantro", "Asparagus", "Blackberries", "Plums", "Brussels Sprouts", "Okra", "Beans", "Lettuce, Green Leaf", "Vegetables Other", "Coconuts", "Peppers, Serrano", "Squash", "Cactus Leaf (nopales)", "Peppers, Anaheim", "Squash, Zucchini", "Spinach", "Olives", "Pineapples", "Chayote", "Jicama", "Cactus Pears", "Eggplant", "Melon, Hami", "Radishes", "Garlic", "Artichokes", "Tomatoes, Cherry", "Peppers, Poblano", "Bok Choy", "Mixed and Misc Melons", "Fruits Other", "Greens, Kale", "Jackfruit", "Chinese Cabbage"];    // ordered list
   const REGIONS = ["Arizona", "California", "Colorado", "Florida", "Great Lakes", "Mexico-Arizona", "Mexico-California", "Mexico-New Mexico", "Mexico-Texas", "Mid-Atlantic", "New York", "PNW", "Southeast", "Texas"];            // all regions observed (incl Mexico)
+
+  const ALL_COMMODITIES_KEY = "All Commodities";
 
   // ═══════════════════════════════════════════════════════════════
   // STATE → REGION mapping (USDA AMS shipping districts)
   // ═══════════════════════════════════════════════════════════════
   const STATE_TO_REGION = {
-    // Single-state regions
     "Arizona":     "Arizona",
     "California":  "California",
     "Colorado":    "Colorado",
     "Florida":     "Florida",
     "New York":    "New York",
     "Texas":       "Texas",
-    // Great Lakes (per AMS AgRTQ: MI, MN, WI; we extend to OH/IN/IL like Movement Reports do)
     "Michigan":    "Great Lakes",
     "Minnesota":   "Great Lakes",
     "Wisconsin":   "Great Lakes",
     "Ohio":        "Great Lakes",
     "Indiana":     "Great Lakes",
     "Illinois":    "Great Lakes",
-    // Mid-Atlantic
-    "Pennsylvania":   "Mid-Atlantic",
-    "New Jersey":     "Mid-Atlantic",
-    "Delaware":       "Mid-Atlantic",
-    "Maryland":       "Mid-Atlantic",
-    "Virginia":       "Mid-Atlantic",
-    "West Virginia":  "Mid-Atlantic",
-    // PNW (per AMS AgRTQ: ID, OR, WA)
+    "Pennsylvania":  "Mid-Atlantic",
+    "New Jersey":    "Mid-Atlantic",
+    "Delaware":      "Mid-Atlantic",
+    "Maryland":      "Mid-Atlantic",
+    "Virginia":      "Mid-Atlantic",
+    "West Virginia": "Mid-Atlantic",
     "Washington":  "PNW",
     "Oregon":      "PNW",
     "Idaho":       "PNW",
-    // Southeast (per AMS AgRTQ: NC, SC, GA — Movement Reports also include AL/TN/KY)
     "North Carolina":  "Southeast",
     "South Carolina":  "Southeast",
     "Georgia":         "Southeast",
@@ -347,36 +595,42 @@
     "Kentucky":        "Southeast",
   };
 
-  // Region centroids for on-map labels (Albers projected, 975×610 viewport).
+  // Region labels with positions in Albers (975×610 US fits within 975×830 viewBox).
+  // `leader` optional: draw a thin line from the label box to a target state-centroid hint.
   const REGION_LABELS = [
-    { region: "PNW",          x: 185, y: 130, text: "PNW" },
+    { region: "PNW",          x: 195, y: 130, text: "PNW" },
     { region: "California",   x: 110, y: 270, text: "CALIF" },
-    { region: "Arizona",      x: 220, y: 360, text: "ARIZ" },
-    { region: "Colorado",     x: 340, y: 290, text: "COLO" },
-    { region: "Texas",        x: 460, y: 450, text: "TEXAS" },
-    { region: "Great Lakes",  x: 605, y: 200, text: "GREAT LAKES" },
-    { region: "New York",     x: 800, y: 195, text: "NY" },
-    { region: "Mid-Atlantic", x: 790, y: 265, text: "MID-ATL" },
-    { region: "Southeast",    x: 700, y: 380, text: "SE" },
-    { region: "Florida",      x: 765, y: 510, text: "FLA" },
+    { region: "Arizona",      x: 235, y: 360, text: "ARIZ" },
+    { region: "Colorado",     x: 345, y: 290, text: "COLO" },
+    { region: "Texas",        x: 470, y: 450, text: "TEXAS" },
+    { region: "Great Lakes",  x: 605, y: 205, text: "GREAT LAKES" },
+    { region: "New York",     x: 845, y: 155, text: "NY",      leader: { x: 805, y: 180 } },
+    { region: "Mid-Atlantic", x: 880, y: 250, text: "MID-ATL", leader: { x: 800, y: 225 } },
+    { region: "Southeast",    x: 705, y: 380, text: "SE" },
+    { region: "Florida",      x: 800, y: 510, text: "FLA" },
   ];
 
-  // Mexico crossing boxes — positioned below the US map (Mexico territory area)
+  // US-MX border crossings. Marker x/y = exact Albers projection of the crossing town
+  // (computed via d3.geoAlbers().scale(1300).translate([487.5, 305]) so they sit on the border).
+  // Card x/y = label-card center, placed inside the real projected Mexico territory.
   const MEXICO_CROSSINGS = [
-    { region: "Mexico-California", x: 85,  label: "MX-CA" },
-    { region: "Mexico-Arizona",    x: 205, label: "MX-AZ" },
-    { region: "Mexico-New Mexico", x: 325, label: "MX-NM" },
-    { region: "Mexico-Texas",      x: 445, label: "MX-TX" },
+    { region: "Mexico-California", name: "Otay Mesa",       marker: { x: 101, y: 402 }, card: { x:  95, y: 427 } },
+    { region: "Mexico-Arizona",    name: "Nogales",         marker: { x: 211, y: 451 }, card: { x: 200, y: 479 } },
+    { region: "Mexico-New Mexico", name: "Santa Teresa",    marker: { x: 285, y: 450 }, card: { x: 280, y: 488 } },
+    { region: "Mexico-Texas",      name: "Laredo / Pharr",  marker: { x: 440, y: 574 }, card: { x: 434, y: 606 } },
   ];
 
   // ═══════════════════════════════════════════════════════════════
   // STATE
   // ═══════════════════════════════════════════════════════════════
-  let currentCommodity = COMMODITIES[0] || "All Commodities";
+  let currentCommodity = ALL_COMMODITIES_KEY;
   let currentMonth = "all";
+  let currentView = "map";
   let topology = null;
   let statePaths = null;
-  let nationPath = null;
+  let contiguousNationFeature = null;
+  let featuredCommodities = [];
+  let dropdownCommodities = [];
 
   // ═══════════════════════════════════════════════════════════════
   // HELPERS
@@ -394,6 +648,15 @@
     if (month === "all") return (d.jul||0) + (d.aug||0) + (d.sep||0);
     return d[month] || 0;
   }
+  function totalQ3Volume(commodity) {
+    const data = PRODUCTION[commodity] || {};
+    let total = 0;
+    for (const region in data) {
+      const r = data[region] || {};
+      total += (r.jul || 0) + (r.aug || 0) + (r.sep || 0);
+    }
+    return total;
+  }
   function heatColor(value, maxValue) {
     if (value <= 0 || maxValue <= 0) return "var(--no-data)";
     const t = value / maxValue;
@@ -408,21 +671,76 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDER · CONTROLS
+  // COMMODITY SELECTOR — All + top-5 featured + dropdown
   // ═══════════════════════════════════════════════════════════════
+  function computeFeaturedCommodities() {
+    const individual = COMMODITIES.filter(c => c !== ALL_COMMODITIES_KEY);
+    const sorted = individual.slice().sort((a, b) => totalQ3Volume(b) - totalQ3Volume(a));
+    featuredCommodities = sorted.slice(0, 5);
+    dropdownCommodities = sorted.slice(5);
+  }
+
   function renderCommodityPills() {
     const el = document.getElementById("commodityPills");
-    el.innerHTML = COMMODITIES.map(c =>
-      `<button class="pill ${c===currentCommodity?'active':''}" data-c="${c}">${c}</button>`
-    ).join("");
-    el.querySelectorAll(".pill").forEach(b => {
+    const inDropdown = dropdownCommodities.includes(currentCommodity);
+    const morePillLabel = inDropdown
+      ? `${currentCommodity} <span class="chev">▾</span>`
+      : `More commodities <span class="chev">▾</span>`;
+
+    let html = "";
+    html += `<button class="pill ${currentCommodity===ALL_COMMODITIES_KEY?'active':''}" data-c="${ALL_COMMODITIES_KEY}">All Commodities</button>`;
+    featuredCommodities.forEach(c => {
+      html += `<button class="pill ${c===currentCommodity?'active':''}" data-c="${c}">${c}</button>`;
+    });
+    if (dropdownCommodities.length) {
+      html += `<span class="more-wrap" id="moreWrap">
+        <button class="pill more-pill ${inDropdown?'active':''}" id="morePill" aria-haspopup="true" aria-expanded="false">${morePillLabel}</button>
+        <div class="more-panel" id="morePanel" role="menu"></div>
+      </span>`;
+    }
+    el.innerHTML = html;
+
+    el.querySelectorAll(".pill[data-c]").forEach(b => {
       b.addEventListener("click", () => {
         currentCommodity = b.dataset.c;
+        closeDropdown();
         renderCommodityPills();
         renderAll();
       });
     });
+
+    if (dropdownCommodities.length) {
+      const panel = document.getElementById("morePanel");
+      panel.innerHTML = dropdownCommodities
+        .map(c => `<button class="more-item ${c===currentCommodity?'active':''}" data-c="${c}" role="menuitem">${c}</button>`)
+        .join("");
+      panel.querySelectorAll(".more-item").forEach(b => {
+        b.addEventListener("click", () => {
+          currentCommodity = b.dataset.c;
+          closeDropdown();
+          renderCommodityPills();
+          renderAll();
+        });
+      });
+      document.getElementById("morePill").addEventListener("click", (e) => {
+        e.stopPropagation();
+        const open = panel.classList.toggle("open");
+        e.currentTarget.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
   }
+
+  function closeDropdown() {
+    const panel = document.getElementById("morePanel");
+    if (panel) panel.classList.remove("open");
+    const pill = document.getElementById("morePill");
+    if (pill) pill.setAttribute("aria-expanded", "false");
+  }
+  document.addEventListener("click", (e) => {
+    const wrap = document.getElementById("moreWrap");
+    if (wrap && !wrap.contains(e.target)) closeDropdown();
+  });
+
   function bindMonthPills() {
     document.querySelectorAll("#monthPills .pill").forEach(b => {
       b.addEventListener("click", () => {
@@ -435,22 +753,117 @@
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDER · MAP (D3 + TopoJSON)
+  // VIEW TOGGLE
+  // ═══════════════════════════════════════════════════════════════
+  function bindViewToggle() {
+    document.querySelectorAll(".seg-btn").forEach(b => {
+      b.addEventListener("click", () => {
+        if (b.classList.contains("active")) return;
+        document.querySelectorAll(".seg-btn").forEach(p => {
+          p.classList.remove("active");
+          p.setAttribute("aria-selected", "false");
+        });
+        b.classList.add("active");
+        b.setAttribute("aria-selected", "true");
+        currentView = b.dataset.view;
+        const mapPane = document.getElementById("mapPane");
+        const chartPane = document.getElementById("chartPane");
+        const vizLayout = document.querySelector(".viz-layout");
+        if (currentView === "map") {
+          chartPane.classList.add("hidden");
+          chartPane.setAttribute("aria-hidden", "true");
+          mapPane.classList.remove("hidden");
+          mapPane.setAttribute("aria-hidden", "false");
+          vizLayout.classList.remove("chart-active");
+        } else {
+          mapPane.classList.add("hidden");
+          mapPane.setAttribute("aria-hidden", "true");
+          chartPane.classList.remove("hidden");
+          chartPane.setAttribute("aria-hidden", "false");
+          vizLayout.classList.add("chart-active");
+        }
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MAP — D3 + TopoJSON, AK/HI removed, Mexico shape behind US
   // ═══════════════════════════════════════════════════════════════
   async function loadTopology() {
-    const res = await fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json");
-    topology = await res.json();
-    statePaths = topojson.feature(topology, topology.objects.states).features;
-    nationPath = topojson.feature(topology, topology.objects.nation);
+    const [usRes, worldRes] = await Promise.all([
+      fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json"),
+      fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json"),
+    ]);
+    topology = await usRes.json();
+    const worldTopo = await worldRes.json();
+
+    // Filter out Alaska (FIPS 02) and Hawaii (FIPS 15)
+    const contiguousGeoms = topology.objects.states.geometries
+      .filter(g => g.id !== "02" && g.id !== "15");
+    statePaths = contiguousGeoms.map(g => topojson.feature(topology, g));
+    contiguousNationFeature = topojson.merge(topology, contiguousGeoms);
+
     const path = d3.geoPath();
-    document.getElementById("nationPath").setAttribute("d", path(nationPath));
+    document.getElementById("nationPath").setAttribute("d", path(contiguousNationFeature));
+
+    // Project Mexico (lat/long) through an Albers matched to us-atlas:
+    // us-atlas states-albers-10m.json is rendered via geoAlbersUsa with scale=1300, translate=[487.5, 305].
+    // The lower-48 sub-projection of geoAlbersUsa is geoAlbers() with default rotate/center/parallels,
+    // so we use geoAlbers() with the same scale & translate to align with the US shapes.
+    const albers = d3.geoAlbers()
+      .scale(1300)
+      .translate([487.5, 305]);
+    const albersPath = d3.geoPath(albers);
+
+    const countries = topojson.feature(worldTopo, worldTopo.objects.countries).features;
+    const mexicoFeature = countries.find(
+      f => f.id === "484" || f.id === 484 || (f.properties && f.properties.name === "Mexico")
+    );
+
+    const mexicoG = document.getElementById("mexicoShapeG");
+    if (mexicoFeature) {
+      const d = albersPath(mexicoFeature);
+      // Label position: roughly central Mexico (Mexico City area), well inside the shape.
+      mexicoG.innerHTML =
+        `<path class="mexico-shape" d="${d}" />
+         <text class="mexico-label" x="430" y="740" text-anchor="middle">MEXICO</text>`;
+    } else {
+      mexicoG.innerHTML = "";
+    }
+  }
+
+  function appendLabelBox(parent, x, y, text, leader) {
+    const g = parent.append("g").attr("class", "label-group");
+    if (leader) {
+      g.append("line")
+        .attr("class", "lbl-leader")
+        .attr("x1", x).attr("y1", y)
+        .attr("x2", leader.x).attr("y2", leader.y);
+      g.append("circle")
+        .attr("cx", leader.x).attr("cy", leader.y).attr("r", 1.5)
+        .attr("fill", "var(--ink-muted)");
+    }
+    const t = g.append("text")
+      .attr("class", "lbl-text")
+      .attr("x", x).attr("y", y)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "central")
+      .text(text);
+    const bbox = t.node().getBBox();
+    const padX = 6, padY = 3;
+    g.insert("rect", "text")
+      .attr("class", "lbl-bg")
+      .attr("x", bbox.x - padX)
+      .attr("y", bbox.y - padY)
+      .attr("width", bbox.width + padX * 2)
+      .attr("height", bbox.height + padY * 2)
+      .attr("rx", 4).attr("ry", 4);
   }
 
   function renderMap() {
     const path = d3.geoPath();
     const statesG = d3.select("#statesG");
 
-    // compute region values & max for color scaling
     const regionValues = {};
     let maxVal = 0;
     REGIONS.forEach(r => {
@@ -460,12 +873,9 @@
     });
 
     const tooltip = document.getElementById("tooltip");
-    const mapEl = document.querySelector(".map-container");
+    const mapEl = document.querySelector("#mapPane .map-container");
 
-    // bind states
-    const states = statesG.selectAll("path.state")
-      .data(statePaths, d => d.id);
-
+    const states = statesG.selectAll("path.state").data(statePaths, d => d.id);
     states.enter()
       .append("path")
       .attr("class", "state")
@@ -477,6 +887,7 @@
         return heatColor(regionValues[region] || 0, maxVal);
       })
       .on("mouseenter", function(event, d) {
+        d3.select(this).raise();
         const region = STATE_TO_REGION[d.properties.name];
         const v = region ? (regionValues[region] || 0) : 0;
         if (region) {
@@ -494,40 +905,53 @@
         tooltip.style.top  = (event.clientY - rect.top - 12) + "px";
       })
       .on("mouseleave", () => { tooltip.style.opacity = "0"; });
-
     states.exit().remove();
 
-    // region labels
+    // labels with white background boxes
     const labelsG = d3.select("#labelsG");
     labelsG.selectAll("*").remove();
     REGION_LABELS.forEach(l => {
-      labelsG.append("text")
-        .attr("class", "region-label")
-        .attr("x", l.x).attr("y", l.y)
-        .attr("text-anchor", "middle")
-        .text(l.text);
+      appendLabelBox(labelsG, l.x, l.y, l.text, l.leader);
     });
 
-    // Mexico crossing boxes (below the US, in the "Mexico" area)
-    const mexicoG = d3.select("#mexicoG");
-    mexicoG.selectAll("*").remove();
-    const mexY = 640;
-    // Section header
-    mexicoG.append("text")
-      .attr("class", "mexico-section-label")
-      .attr("x", 85).attr("y", mexY - 6)
-      .text("MEXICO · IMPORT CROSSINGS");
+    // border crossing markers + connectors + cards
+    const crossingsG = d3.select("#crossingsG");
+    crossingsG.selectAll("*").remove();
+    MEXICO_CROSSINGS.forEach(xc => {
+      const v = regionValues[xc.region] || 0;
 
-    MEXICO_CROSSINGS.forEach(m => {
-      const v = regionValues[m.region] || 0;
-      const fill = heatColor(v, maxVal);
-      mexicoG.append("rect")
-        .attr("class", "mexico-box")
-        .attr("x", m.x).attr("y", mexY).attr("width", 110).attr("height", 32)
-        .attr("fill", fill)
+      crossingsG.append("line")
+        .attr("class", "xing-connector")
+        .attr("x1", xc.marker.x).attr("y1", xc.marker.y)
+        .attr("x2", xc.card.x + 55).attr("y2", xc.card.y);
+
+      const g = crossingsG.append("g").attr("class", "xing-card");
+      const name = g.append("text")
+        .attr("class", "xing-card-name")
+        .attr("x", xc.card.x + 55).attr("y", xc.card.y + 11)
+        .attr("text-anchor", "middle")
+        .text(xc.name);
+      g.append("text")
+        .attr("class", "xing-card-vol")
+        .attr("x", xc.card.x + 55).attr("y", xc.card.y + 26)
+        .attr("text-anchor", "middle")
+        .text(fmt(v));
+      const nameBB = name.node().getBBox();
+      const cardW = Math.max(nameBB.width + 16, 100);
+      g.insert("rect", "text")
+        .attr("class", "xing-card-bg")
+        .attr("x", xc.card.x + 55 - cardW / 2)
+        .attr("y", xc.card.y - 2)
+        .attr("width", cardW)
+        .attr("height", 34)
+        .attr("rx", 6).attr("ry", 6);
+
+      crossingsG.append("circle")
+        .attr("class", "xing-marker")
+        .attr("cx", xc.marker.x).attr("cy", xc.marker.y).attr("r", 5)
         .on("mouseenter", function(event) {
-          tooltip.innerHTML = `<strong>${m.region}</strong>
-            <div class="tt-detail">${fmt(v)}</div>`;
+          tooltip.innerHTML = `<strong>${xc.name}</strong>
+            <div class="tt-detail">${xc.region} · ${fmt(v)}</div>`;
           tooltip.style.opacity = "1";
         })
         .on("mousemove", function(event) {
@@ -536,39 +960,91 @@
           tooltip.style.top  = (event.clientY - rect.top - 12) + "px";
         })
         .on("mouseleave", () => { tooltip.style.opacity = "0"; });
-
-      mexicoG.append("text")
-        .attr("class", "mexico-label")
-        .attr("x", m.x + 55).attr("y", mexY + 13)
-        .attr("text-anchor", "middle")
-        .text(m.label);
-      mexicoG.append("text")
-        .attr("class", "mexico-label")
-        .attr("x", m.x + 55).attr("y", mexY + 26)
-        .attr("text-anchor", "middle")
-        .text(fmt(v));
     });
 
     return { regionValues, maxVal };
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // CHART — horizontal bars ranked desc by current volume
+  // ═══════════════════════════════════════════════════════════════
+  function renderChart(regionValues, maxVal) {
+    const svg = d3.select("#chartSvg");
+    svg.selectAll("*").remove();
+
+    const W = 960, H = 970, marginL = 150, marginR = 110, marginT = 16, marginB = 16;
+    const rows = REGIONS
+      .map(r => ({ region: r, value: regionValues[r] || 0 }))
+      .sort((a, b) => b.value - a.value);
+
+    svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+    if (rows.length === 0 || maxVal <= 0) {
+      svg.append("text").attr("class", "chart-empty").attr("x", W/2).attr("y", H/2).text("No data for current selection");
+      return;
+    }
+
+    const gap = 6;
+    const usableH = H - marginT - marginB;
+    const rowH = (usableH - (rows.length - 1) * gap) / rows.length;
+    const barMaxW = W - marginL - marginR;
+
+    rows.forEach((row, i) => {
+      const y = marginT + i * (rowH + gap);
+      const t = row.value / maxVal;
+      const w = Math.max(barMaxW * t, row.value > 0 ? 4 : 0);
+
+      svg.append("text")
+        .attr("class", "chart-row-label")
+        .attr("x", marginL - 10).attr("y", y + rowH / 2)
+        .attr("text-anchor", "end")
+        .attr("dominant-baseline", "central")
+        .text(row.region);
+
+      svg.append("rect")
+        .attr("class", "chart-bar")
+        .attr("x", marginL).attr("y", y)
+        .attr("width", w).attr("height", rowH)
+        .attr("rx", 4).attr("ry", 4)
+        .attr("fill", row.value > 0 ? heatColor(row.value, maxVal) : "var(--no-data)");
+
+      svg.append("text")
+        .attr("class", "chart-row-value")
+        .attr("x", marginL + w + 8).attr("y", y + rowH / 2)
+        .attr("dominant-baseline", "central")
+        .text(fmt(row.value));
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // LEGEND
+  // ═══════════════════════════════════════════════════════════════
   function renderLegend(regionValues, maxVal) {
+    // Low on left → render heat-0 first, ascending to heat-7 on right.
     const stops = ["--heat-0","--heat-1","--heat-2","--heat-3","--heat-4","--heat-5","--heat-6","--heat-7"];
     document.getElementById("legendBar").innerHTML = stops
       .map(s => `<div style="background:var(${s})"></div>`).join("");
-    document.getElementById("legendEnds").innerHTML = `<span>0</span><span>${fmt(maxVal)}</span>`;
+    document.getElementById("legendHigh").textContent = fmt(maxVal);
+    document.getElementById("legendLow").textContent = "0";
 
-    // top region callout
     let top = { region: "—", v: 0 };
     Object.entries(regionValues).forEach(([r, v]) => { if (v > top.v) top = { region: r, v }; });
     const monthLabel = currentMonth === "all" ? "Q3" : currentMonth.toUpperCase();
     document.getElementById("legendCurrent").innerHTML =
-      `LEADING REGION · ${monthLabel}<strong>${top.region} — ${fmt(top.v)}</strong>`;
+      `Leading region · ${monthLabel}<strong>${top.region} — ${fmt(top.v)}</strong>`;
   }
 
   function renderAll() {
     document.getElementById("commodityName").textContent = currentCommodity;
-    const { regionValues, maxVal } = renderMap();
+    const regionValues = {};
+    let maxVal = 0;
+    REGIONS.forEach(r => {
+      const v = getRegionValue(r, currentCommodity, currentMonth);
+      regionValues[r] = v;
+      if (v > maxVal) maxVal = v;
+    });
+    renderMap();
+    renderChart(regionValues, maxVal);
     renderLegend(regionValues, maxVal);
   }
 
@@ -576,15 +1052,20 @@
   // INIT
   // ═══════════════════════════════════════════════════════════════
   (async function init() {
+    computeFeaturedCommodities();
+    if (!COMMODITIES.includes(ALL_COMMODITIES_KEY)) {
+      currentCommodity = COMMODITIES[0] || ALL_COMMODITIES_KEY;
+    }
     renderCommodityPills();
     bindMonthPills();
+    bindViewToggle();
     try {
       await loadTopology();
       renderAll();
     } catch (e) {
       console.error("Failed to load US map:", e);
-      document.querySelector(".map-container").innerHTML =
-        `<div style="padding:40px;text-align:center;color:#999999">
+      document.querySelector("#mapPane .map-container").innerHTML =
+        `<div style="padding:40px;text-align:center;color:#9a9a9a">
           Could not load US map data from CDN. Check internet connection.
         </div>`;
     }

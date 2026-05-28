@@ -11,32 +11,32 @@
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 <style>
   :root {
-    --bg: #ffffff;
+    --bg: #fafafa;
     --bg-soft: #fafafa;
     --ink: #1a1a1a;
-    --ink-soft: #5a5a5a;
-    --ink-muted: #9a9a9a;
-    --rule: #e5e5e5;
+    --ink-soft: #666666;
+    --ink-muted: #999999;
+    --rule: #eef0f2;
 
-    --green: #4a8b2c;            /* olive drab — mid-point / active state */
-    --green-dark: #1d3711;
+    --green: #4a8b2c;
+    --green-dark: #3a7522;
     --green-darker: #16290d;
-    --green-light: #e8f1de;
+    --green-light: #e8f5e0;
     --green-hover: #f0f7ea;
-    --orange: #ec7700;           /* Mango Tango — selected/marker accent ONLY */
+    --orange: #ec7700;
 
-    --no-data: #f0f0f0;
+    --no-data: #f4f4f4;
     --mexico-fill: #f4f4f4;
 
-    /* heat ramp anchored at olive drab #4a8b2c (mid) → #16290d (darkest) */
-    --heat-0: #e8f1de;
-    --heat-1: #d0e4b8;
-    --heat-2: #a8cf85;
-    --heat-3: #75b34f;
+    /* heat ramp: green → orange */
+    --heat-0: #e8f5e0;
+    --heat-1: #c5e1a5;
+    --heat-2: #a8d490;
+    --heat-3: #7cb854;
     --heat-4: #4a8b2c;
-    --heat-5: #356821;
-    --heat-6: #1d3711;
-    --heat-7: #16290d;
+    --heat-5: #ec7700;
+    --heat-6: #d96625;
+    --heat-7: #c25e00;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -50,7 +50,13 @@
   }
   h1, h2, h3 { font-family: 'Montserrat', sans-serif; font-weight: 700; }
 
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 48px; }
+  .wrap { max-width: 1060px; margin: 32px auto; padding: 0 24px 48px; }
+  .card {
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
+    padding: 28px 32px;
+  }
 
   /* header */
   .head {
@@ -64,7 +70,7 @@
   }
   .head h1 {
     font-family: 'Montserrat', sans-serif;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--ink);
@@ -245,14 +251,13 @@
   }
   .us-map .nation {
     fill: none;
-    stroke: var(--ink);
-    stroke-width: 0.8;
+    stroke: none;
     pointer-events: none;
   }
   .us-map .mexico-shape {
     fill: var(--mexico-fill);
-    stroke: #9a9a9a;
-    stroke-width: 1;
+    stroke: #ffffff;
+    stroke-width: 0.8;
   }
   .us-map .mexico-label {
     font-family: 'Montserrat', sans-serif;
@@ -353,7 +358,7 @@
     display: block;
     margin-bottom: 2px;
   }
-  .tooltip .tt-detail { font-size: 11px; color: #b7d394; }
+  .tooltip .tt-detail { font-size: 11px; color: #ec7700; }
 
   /* chart view */
   .chart-svg {
@@ -482,6 +487,7 @@
 <body>
 
 <div class="wrap">
+<div class="card">
 
   <div class="head">
     <h1>Q3 Reefer Volume by Region — <span class="commodity-name" id="commodityName"></span></h1>
@@ -543,6 +549,7 @@
   </div>
 
   <div class="source">Source: USDA AMS Specialty Crops Movement Reports · agtransport.usda.gov/rfpn-7etz</div>
+</div>
 </div>
 
 <script>
