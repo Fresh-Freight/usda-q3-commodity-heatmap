@@ -25,8 +25,8 @@
     --green-hover: #f0f7ea;
     --orange: #ec7700;
 
-    --no-data: #e0e0e0;
-    --mexico-fill: #e0e0e0;
+    --no-data: #f4f4f4;
+    --mexico-fill: #f4f4f4;
 
     /* heat ramp: green → orange */
     --heat-0: #e8f5e0;
@@ -212,10 +212,10 @@
   /* viz area + cross-fade */
   .viz-area {
     position: relative;
-    background: var(--bg);
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    padding: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 12px 0;
     display: grid;
   }
   .viz-pane {
@@ -255,7 +255,6 @@
     pointer-events: none;
   }
   .us-map .mexico-shape {
-    fill: var(--mexico-fill);
     stroke: #ffffff;
     stroke-width: 0.8;
   }
@@ -825,7 +824,7 @@
       const d = albersPath(mexicoFeature);
       // Label position: roughly central Mexico (Mexico City area), well inside the shape.
       mexicoG.innerHTML =
-        `<path class="mexico-shape" d="${d}" />
+        `<path class="mexico-shape" d="${d}" fill="var(--mexico-fill)" />
          <text class="mexico-label" x="430" y="740" text-anchor="middle">MEXICO</text>`;
     } else {
       mexicoG.innerHTML = "";
