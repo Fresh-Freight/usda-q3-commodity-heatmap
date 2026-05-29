@@ -40,7 +40,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    background: var(--bg);
+    background: transparent;
     color: var(--ink);
     font-family: 'Open Sans', system-ui, sans-serif;
     font-size: 14px;
@@ -50,12 +50,12 @@
   }
   h1, h2, h3 { font-family: 'Montserrat', sans-serif; font-weight: 700; }
 
-  .wrap { max-width: 1060px; margin: 24px auto; padding: 0 24px 24px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0; }
   .card {
     background: #ffffff;
     border-radius: 10px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.04);
-    padding: 28px 32px 24px;
+    padding: 24px 28px 20px;
   }
 
   /* header */
@@ -64,8 +64,8 @@
     justify-content: space-between;
     align-items: baseline;
     border-bottom: 1px solid var(--rule);
-    padding-bottom: 14px;
-    margin-bottom: 20px;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
     gap: 16px;
   }
   .head h1 {
@@ -88,8 +88,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-bottom: 14px;
-    padding-bottom: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--rule);
   }
   .ctrl-row {
